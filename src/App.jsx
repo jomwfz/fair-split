@@ -22,8 +22,16 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  ChevronUp
-} from 'lucide-react';
+  ChevronUp,
+  LogOut,
+  History,
+  Save
+} from 'lucide-react'
+
+import { auth, googleProvider, db } from './firebase'; // ดึงตัวตนที่เราสร้างไว้มาใช้
+import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth'; // คำสั่ง Login/Logout
+import { collection, addDoc, query, where, getDocs, orderBy, deleteDoc, doc } from 'firebase/firestore'; // คำสั่งฐานข้อมูล
+;
 
 // --- Native PromptPay Payload Generator ---
 function generatePromptPayPayload(target, amount) {
@@ -56,8 +64,9 @@ function generatePromptPayPayload(target, amount) {
 
   const crc = (str) => {
     let crc = 0xFFFF;
+    let x;
     for (let i = 0; i < str.length; i++) {
-      let x = ((crc >> 8) ^ str.charCodeAt(i)) & 0xFF;
+      x = ((crc >> 8) ^ str.charCodeAt(i)) & 0xFF;
       x ^= x >> 4;
       crc = ((crc << 8) ^ (x << 12) ^ (x << 5) ^ x) & 0xFFFF;
     }
@@ -90,7 +99,167 @@ const App = () => {
   const [promptPayId, setPromptPayId] = useState('');
   const [showQR, setShowQR] = useState(false);
 
-  // --- ACTIONS ---
+  // --- 🔥 NEW STATE: Firebase User & History ---
+  const [user, setUser] = useState(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyList, setHistoryList] = useState([]);
+
+  // --- 🔥 NEW EFFECT: Check Auth Status ---
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // --- CALCULATIONS (Moved up to be used in Save function) ---
+  const groupedItems = useMemo(() => {
+    const groups = {};
+    items.forEach(item => {
+      const groupKey = item.baseName || item.name.replace(/\s\(\d+\)$/, '');
+      if (!groups[groupKey]) groups[groupKey] = [];
+      groups[groupKey].push(item);
+    });
+    return groups;
+  }, [items]);
+
+  useEffect(() => {
+    if (items.length > 0) {
+      const newGroups = {};
+      Object.keys(groupedItems).forEach(g => {
+        if (expandedGroups[g] === undefined) newGroups[g] = true;
+      });
+      if (Object.keys(newGroups).length > 0) setExpandedGroups(prev => ({
+        ...prev,
+        ...newGroups
+      }));
+    }
+  }, [groupedItems]);
+
+  const {
+    subtotal,
+    serviceChargeAmount,
+    vatAmount,
+    grandTotal,
+    memberShares
+  } = useMemo(() => {
+    let rawTotal = 0;
+    let shares = {};
+    members.forEach(m => shares[m] = 0);
+    items.forEach(item => {
+      const safePrice = Number(item.price) || 0;
+      rawTotal += safePrice;
+      const count = item.participants.length;
+      if (count > 0) {
+        const pricePerPerson = safePrice / count;
+        item.participants.forEach(p => {
+          if (shares[p] !== undefined) shares[p] += pricePerPerson;
+        });
+      }
+    });
+    const svcRate = useServiceCharge ? (serviceChargePercent / 100) : 0;
+    const vatRate = useVat ? 0.07 : 0;
+    const calculatedSvc = rawTotal * svcRate;
+    const vatableAmount = rawTotal + calculatedSvc;
+    const calculatedVat = vatableAmount * vatRate;
+    const calculatedGrandTotal = rawTotal + calculatedSvc + calculatedVat;
+    if (rawTotal > 0) {
+      Object.keys(shares).forEach(m => {
+        const userRawShare = shares[m];
+        const userSvc = userRawShare * svcRate;
+        const userVatable = userRawShare + userSvc;
+        const userVat = userVatable * vatRate;
+        shares[m] = userRawShare + userSvc + userVat;
+      });
+    }
+    return {
+      subtotal: rawTotal,
+      serviceChargeAmount: calculatedSvc,
+      vatAmount: calculatedVat,
+      grandTotal: calculatedGrandTotal,
+      memberShares: shares
+    };
+  }, [items, members, useVat, useServiceCharge, serviceChargePercent]);
+
+  // --- 🔥 NEW ACTIONS: Firebase Logic ---
+  const handleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error("Login Error:", error);
+    }
+  };
+
+  const handleLogout = () => {
+    signOut(auth);
+    setHistoryList([]);
+    setShowHistory(false);
+  };
+
+  const saveBillToHistory = async () => {
+    if (!user) return alert("กรุณาเข้าสู่ระบบก่อนบันทึกครับ");
+    if (items.length === 0) return alert("ไม่มีรายการอาหารให้บันทึก");
+
+    try {
+      await addDoc(collection(db, "bills"), {
+        uid: user.uid,
+        billName: `บิลวันที่ ${new Date().toLocaleDateString('th-TH')} ${new Date().toLocaleTimeString('th-TH')}`,
+        date: new Date(),
+        items: items,
+        members: members,
+        totalAmount: grandTotal, // ใช้ grandTotal ที่คำนวณไว้แล้ว
+        subtotal: subtotal,
+        serviceChargeAmount: serviceChargeAmount,
+        vatAmount: vatAmount
+      });
+      alert("บันทึกเรียบร้อย! ✅");
+    } catch (error) {
+      console.error("Error adding document: ", error);
+      alert("บันทึกไม่สำเร็จ ❌");
+    }
+  };
+
+  const fetchHistory = async () => {
+    if (!user) return;
+    setShowHistory(true);
+    try {
+      const q = query(
+        collection(db, "bills"),
+        where("uid", "==", user.uid),
+        orderBy("date", "desc")
+      );
+      const querySnapshot = await getDocs(q);
+      const bills = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setHistoryList(bills);
+    } catch (error) {
+      console.error("Error fetching history:", error);
+    }
+  };
+
+  const deleteHistoryItem = async (id) => {
+    if (!window.confirm("ยืนยันจะลบบิลนี้ไหม?")) return;
+    try {
+      await deleteDoc(doc(db, "bills", id));
+      fetchHistory(); // โหลดใหม่
+    } catch (error) {
+      console.error("Error deleting:", error);
+    }
+  };
+  
+  // ฟังก์ชันโหลดบิลเก่ามาแก้ไข (Optional)
+  const loadBillFromHistory = (bill) => {
+    if(window.confirm("การโหลดบิลเก่าจะทับข้อมูลปัจจุบัน ยืนยันไหม?")) {
+        setMembers(bill.members);
+        setItems(bill.items);
+        setShowHistory(false);
+        setActiveTab('summary');
+    }
+  }
+
+  // --- ACTIONS (Existing) ---
   const handleClearBill = () => {
     if (window.confirm("ต้องการล้างบิลทั้งหมดและเริ่มใหม่ใช่ไหม?")) {
       setMembers(['เรา']);
@@ -216,75 +385,6 @@ const App = () => {
     setServiceChargePercent(Number(valStr)); // อัปเดตค่าจริงที่ใช้คำนวณ
   };
 
-  // --- CALCULATIONS ---
-  const groupedItems = useMemo(() => {
-    const groups = {};
-    items.forEach(item => {
-      const groupKey = item.baseName || item.name.replace(/\s\(\d+\)$/, '');
-      if (!groups[groupKey]) groups[groupKey] = [];
-      groups[groupKey].push(item);
-    });
-    return groups;
-  }, [items]);
-
-  useEffect(() => {
-    if (items.length > 0) {
-      const newGroups = {};
-      Object.keys(groupedItems).forEach(g => {
-        if (expandedGroups[g] === undefined) newGroups[g] = true;
-      });
-      if (Object.keys(newGroups).length > 0) setExpandedGroups(prev => ({
-        ...prev,
-        ...newGroups
-      }));
-    }
-  }, [groupedItems]);
-
-  const {
-    subtotal,
-    serviceChargeAmount,
-    vatAmount,
-    grandTotal,
-    memberShares
-  } = useMemo(() => {
-    let rawTotal = 0;
-    let shares = {};
-    members.forEach(m => shares[m] = 0);
-    items.forEach(item => {
-      const safePrice = Number(item.price) || 0;
-      rawTotal += safePrice;
-      const count = item.participants.length;
-      if (count > 0) {
-        const pricePerPerson = safePrice / count;
-        item.participants.forEach(p => {
-          if (shares[p] !== undefined) shares[p] += pricePerPerson;
-        });
-      }
-    });
-    const svcRate = useServiceCharge ? (serviceChargePercent / 100) : 0;
-    const vatRate = useVat ? 0.07 : 0;
-    const calculatedSvc = rawTotal * svcRate;
-    const vatableAmount = rawTotal + calculatedSvc;
-    const calculatedVat = vatableAmount * vatRate;
-    const calculatedGrandTotal = rawTotal + calculatedSvc + calculatedVat;
-    if (rawTotal > 0) {
-      Object.keys(shares).forEach(m => {
-        const userRawShare = shares[m];
-        const userSvc = userRawShare * svcRate;
-        const userVatable = userRawShare + userSvc;
-        const userVat = userVatable * vatRate;
-        shares[m] = userRawShare + userSvc + userVat;
-      });
-    }
-    return {
-      subtotal: rawTotal,
-      serviceChargeAmount: calculatedSvc,
-      vatAmount: calculatedVat,
-      grandTotal: calculatedGrandTotal,
-      memberShares: shares
-    };
-  }, [items, members, useVat, useServiceCharge, serviceChargePercent]);
-
   const qrPayload = useMemo(() => {
     if (!promptPayId || (promptPayId.length !== 10 && promptPayId.length !== 13)) return "";
     if (promptPayId.length === 10 && !promptPayId.startsWith('0')) return "";
@@ -324,12 +424,12 @@ const App = () => {
               ))}
             </div>
             <div className="input-row">
-              <input 
-                type="text" 
-                placeholder="เพิ่มชื่อเพื่อน..." 
-                value={memberName} 
-                onChange={(e) => setMemberName(e.target.value)} 
-                onKeyDown={(e) => e.key === 'Enter' && handleAddMember()} 
+              <input
+                type="text"
+                placeholder="เพิ่มชื่อเพื่อน..."
+                value={memberName}
+                onChange={(e) => setMemberName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddMember()}
               />
               <button onClick={handleAddMember} disabled={!memberName} className="btn-gray-add">
                 <Plus size={20} />
@@ -346,28 +446,28 @@ const App = () => {
             </div>
             <div className="add-item-wrapper-blue">
               <div className="add-item-row">
-                <input 
-                  className="input-name" 
-                  type="text" 
-                  placeholder="ชื่อเมนู" 
-                  value={itemName} 
-                  onChange={(e) => setItemName(e.target.value)} 
+                <input
+                  className="input-name"
+                  type="text"
+                  placeholder="ชื่อเมนู"
+                  value={itemName}
+                  onChange={(e) => setItemName(e.target.value)}
                 />
-                <input 
-                  className="input-qty" 
-                  type="number" 
-                  min="1" 
-                  placeholder="จำนวน" 
-                  value={itemQty} 
-                  onChange={(e) => setItemQty(e.target.value)} 
+                <input
+                  className="input-qty"
+                  type="number"
+                  min="1"
+                  placeholder="จำนวน"
+                  value={itemQty}
+                  onChange={(e) => setItemQty(e.target.value)}
                 />
-                <input 
-                  className="input-price" 
-                  type="number" 
-                  placeholder="ราคา" 
-                  value={itemPrice} 
-                  onChange={(e) => setItemPrice(e.target.value)} 
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddItem()} 
+                <input
+                  className="input-price"
+                  type="number"
+                  placeholder="ราคา"
+                  value={itemPrice}
+                  onChange={(e) => setItemPrice(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddItem()}
                 />
                 <button onClick={handleAddItem} className="btn-add-blue">เพิ่ม</button>
               </div>
@@ -495,6 +595,27 @@ const App = () => {
             ) : (
               <div className="empty-state">ยังไม่มีข้อมูลการคำนวณ</div>
             )}
+
+            {/* --- 🔥 NEW BUTTONS: Save & History --- */}
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <button 
+                onClick={saveBillToHistory} 
+                className="btn-nav" 
+                style={{ flex: 1, justifyContent: 'center', background: '#e0e7ff', color: '#4f46e5', borderColor: '#c7d2fe' }}
+              >
+                <Save size={16} /> บันทึกบิล
+              </button>
+              {user && (
+                <button 
+                  onClick={fetchHistory} 
+                  className="btn-nav" 
+                  style={{ flex: 1, justifyContent: 'center', background: '#f0f9ff', color: '#0284c7', borderColor: '#bae6fd' }}
+                >
+                  <History size={16} /> ดูประวัติ
+                </button>
+              )}
+            </div>
+
           </div>
         );
       case 'payment':
@@ -586,7 +707,28 @@ const App = () => {
             </li>
           ))}
         </ul>
+
+        {/* --- 🔥 NEW UI: Sidebar Footer with Login --- */}
         <div className="sidebar-footer">
+          {/* ส่วน Login / Profile */}
+          <div style={{ marginBottom: '15px', padding: '10px', background: 'rgba(37,99,235,0.05)', borderRadius: '12px', border: '1px solid #eff6ff' }}>
+             {user ? (
+               <div style={{display: 'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+                 <div style={{display:'flex', alignItems:'center', gap:'8px', overflow:'hidden'}}>
+                    <img src={user.photoURL} alt="" style={{width:'32px', height:'32px', borderRadius:'50%'}} />
+                    <span style={{fontSize:'0.85rem', fontWeight:'500', color:'#334155', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:'80px'}}>{user.displayName.split(' ')[0]}</span>
+                 </div>
+                 <button onClick={handleLogout} style={{background:'white', border:'1px solid #e2e8f0', borderRadius:'6px', padding:'4px', cursor:'pointer', color:'#ef4444'}}>
+                    <LogOut size={14} />
+                 </button>
+               </div>
+             ) : (
+               <button onClick={handleLogin} style={{width:'100%', background:'white', border:'1px solid #cbd5e1', borderRadius:'8px', padding:'8px', cursor:'pointer', fontSize:'0.9rem', fontWeight:'600', color:'#475569', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'}}>
+                 <span style={{color: '#EA4335', fontWeight:'bold'}}>G</span> เข้าสู่ระบบ
+               </button>
+             )}
+          </div>
+
           <div className="total-display-sidebar">
             <small>ยอดรวมทั้งหมด</small>
             <div className="amount">
@@ -620,8 +762,43 @@ const App = () => {
         </div>
       </main>
       {isMobileMenuOpen && <div className="overlay" onClick={() => setIsMobileMenuOpen(false)}></div>}
+
+      {/* --- 🔥 NEW UI: History Modal --- */}
+      {showHistory && (
+        <div className="modal-overlay" style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.5)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:'20px'}}>
+          <div className="modal-content" style={{background:'white', width:'100%', maxWidth:'400px', borderRadius:'16px', maxHeight:'80vh', display:'flex', flexDirection:'column', boxShadow:'0 10px 30px rgba(0,0,0,0.2)'}}>
+            <div className="modal-header" style={{padding:'16px', borderBottom:'1px solid #f1f5f9', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+              <h3 style={{margin:0, fontSize:'1.1rem', display:'flex', alignItems:'center', gap:'8px'}}><History size={20} /> ประวัติบิล</h3>
+              <button onClick={() => setShowHistory(false)} style={{background:'none', border:'none', cursor:'pointer', color:'#94a3b8'}}><X size={24} /></button>
+            </div>
+            
+            <div className="history-list" style={{padding:'16px', overflowY:'auto'}}>
+              {historyList.length === 0 ? (
+                <p style={{textAlign:'center', color:'#94a3b8', marginTop:'20px'}}>ยังไม่มีประวัติบิล</p>
+              ) : (
+                historyList.map(bill => (
+                  <div key={bill.id} className="history-card" onClick={() => loadBillFromHistory(bill)} style={{background:'#f8fafc', border:'1px solid #e2e8f0', padding:'12px', borderRadius:'12px', marginBottom:'10px', cursor:'pointer'}}>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'8px'}}>
+                      <div style={{display:'flex', flexDirection:'column'}}>
+                         <strong style={{color:'#334155', fontSize:'0.95rem'}}>{new Date(bill.date.seconds * 1000).toLocaleDateString('th-TH')}</strong>
+                         <small style={{color:'#94a3b8', fontSize:'0.75rem'}}>{new Date(bill.date.seconds * 1000).toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'})}</small>
+                      </div>
+                      <span style={{color:'#2563eb', fontWeight:'700'}}>{bill.totalAmount?.toLocaleString()} ฿</span>
+                    </div>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:'0.8rem', color:'#64748b'}}>
+                       <span>{bill.items.length} รายการ | {bill.members.length} คน</span>
+                       <button onClick={(e) => { e.stopPropagation(); deleteHistoryItem(bill.id); }} style={{background:'#fee2e2', color:'#ef4444', border:'none', borderRadius:'6px', padding:'4px 8px', cursor:'pointer'}}>ลบ</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
 
-export default App;
+export default App; 

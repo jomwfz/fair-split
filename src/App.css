@@ -743,3 +743,47 @@ body {
 .btn-nav.next:hover {
   background: var(--primary-dark);
 }
+
+/* --- Login & User Profile --- */
+.user-section { display: flex; align-items: center; gap: 10px; }
+.btn-login-google {
+  background: white; color: #333; border: 1px solid #ccc;
+  padding: 8px 16px; border-radius: 20px; font-weight: bold; cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+}
+.user-profile { display: flex; align-items: center; gap: 8px; }
+.user-avatar { width: 36px; height: 36px; border-radius: 50%; border: 2px solid white; cursor: pointer; }
+.btn-logout { background: rgba(0,0,0,0.2); color: white; border: none; padding: 4px 10px; border-radius: 12px; cursor: pointer; font-size: 0.8rem; }
+
+/* --- History Modal --- */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal-content {
+  background: white; width: 100%; max-width: 400px;
+  border-radius: 16px; max-height: 80vh; display: flex; flex-direction: column;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3); animation: slideUp 0.3s;
+}
+.modal-header {
+  padding: 16px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;
+}
+.btn-close { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #999; }
+
+.history-list { padding: 16px; overflow-y: auto; }
+.history-card {
+  background: #f8fafc; border: 1px solid #e2e8f0;
+  padding: 12px; border-radius: 12px; margin-bottom: 10px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.history-info { display: flex; flex-direction: column; font-size: 0.9rem; }
+.history-info strong { color: var(--primary); }
+.history-info small { color: #64748b; font-size: 0.75rem; }
+.btn-delete-hist {
+  background: #fee2e2; color: #ef4444; border: none;
+  padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 0.8rem;
+}
+
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
