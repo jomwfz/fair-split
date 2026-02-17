@@ -676,7 +676,7 @@ const handleClearBill = () => {
       
       // 5. สร้างลิงก์ (เพิ่ม /fair-split เพื่อความชัวร์กับ basename)
       const origin = window.location.origin;
-      const roomLink = `${origin}/fair-split/pay/${docRef.id}`;
+      const roomLink = `${origin}/pay/${docRef.id}`;
       
       // 6. เปิด Modal แสดงผล
       setCreatedRoom({
