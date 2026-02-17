@@ -9,6 +9,19 @@ import {
 } from 'lucide-react';
 import './GuestPay.css'; // เดี๋ยวสร้างไฟล์นี้ต่อ
 
+const avatarEmojis = [
+  "😎","🔥","🐱","🐶","🦊","🐼","🐵","🐯","🐨",
+  "🦁","🐸","🐻","🐰","🦄","👻","🤖","👽","💀",
+  "🍕","🍔","🍟","🍣","🍩","🍿","🥑","🌮","🌈"
+];
+
+const getRandomAvatar = () => {
+  return avatarEmojis[
+    Math.floor(Math.random() * avatarEmojis.length)
+  ];
+};
+
+
 // --- Helper: สร้าง Payload PromptPay ---
 function generatePromptPayPayload(target, amount) {
   const sanitize = (str) => str.replace(/[^0-9]/g, '');
@@ -156,16 +169,28 @@ const GuestPay = () => {
           <h2 className="text-center mb-6 text-gray-600">คุณคือคนไหน?</h2>
           
           <div className="member-grid">
-            {roomData.members.map(name => (
-              <button 
-                key={name} 
-                onClick={() => setSelectedUser(name)}
-                className="member-card-btn"
-              >
-                <div className="member-avatar">{name.charAt(0)}</div>
-                <span>{name}</span>
-              </button>
-            ))}
+              {roomData.members.map(member => {
+
+                // รองรับทั้ง string และ object
+                const name = typeof member === "string" ? member : member.name;
+                const avatar =
+                  typeof member === "string"
+                    ? getRandomAvatar()
+                    : member.avatar || getRandomAvatar();
+
+                return (
+                  <button
+                    key={name}
+                    onClick={() => setSelectedUser(name)}
+                    className="member-card-btn"
+                  >
+                    <div className="member-avatar">
+                      {avatar}
+                    </div>
+                    <span>{name}</span>
+                  </button>
+                );
+              })}
           </div>
         </div>
       </div>

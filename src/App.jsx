@@ -23,6 +23,17 @@ import {
   getDocs, orderBy, deleteDoc, doc, writeBatch // เพิ่ม writeBatch
 } from 'firebase/firestore';
 
+const avatarEmojis = [
+  "😎","🔥","🐱","🐶","🦊","🐼","🐵","🐯","🐨",
+  "🦁","🐸","🐻","🐰","🦄","👻","🤖","👽","💀",
+  "🍕","🍔","🍟","🍣","🍩","🍿","🥑","🌮","🌈"
+];
+
+const getRandomAvatar = () => {
+  return avatarEmojis[
+    Math.floor(Math.random() * avatarEmojis.length)
+  ];
+};
 
 // ======================================================
 // 🔷 HELPER FUNCTIONS (PURE LOGIC)
@@ -94,7 +105,7 @@ const getMemberBreakdown = (bill) => {
   const breakdown = {};
 
   bill.members.forEach(m => {
-    breakdown[m] = {
+    breakdown[m.name] = {
       items: [],
       totalFood: 0,
       extraCharge: 0,
@@ -149,10 +160,21 @@ const App = () => {
   // 🔹 CORE STATE (Bill Data)
   // ==================================================
 
-  const [members, setMembers] = useState(() => {
-    const saved = localStorage.getItem('fs_members');
-    return saved ? JSON.parse(saved) : ['เรา'];
-  });
+const [members, setMembers] = useState(() => {
+  const saved = localStorage.getItem('fs_members');
+
+  if (!saved) {
+    return [{ name: 'เรา', avatar: getRandomAvatar() }];
+  }
+
+  const parsed = JSON.parse(saved);
+
+  // 🔥 FIX: ถ้าไม่มี avatar ให้ generate ใหม่
+  return parsed.map(m => ({
+    name: m.name,
+    avatar: m.avatar || getRandomAvatar()
+  }));
+});
 
   const [items, setItems] = useState(() => {
     const saved = localStorage.getItem('fs_items');
@@ -335,9 +357,9 @@ const App = () => {
     let rawTotal = 0;
     let shares = {};
 
-    members.forEach(m => {
-      shares[m] = 0;
-    });
+  members.forEach(m => {
+    shares[m.name] = 0;
+  });
 
     items.forEach(item => {
 
@@ -411,26 +433,26 @@ const App = () => {
 // ==================================================
 
 const loginMessages = [
-  "กินข้าวมื้อนี้ให้อร่อยนะ 🍜",
-  "อย่าลืมหารให้ครบทุกคนนะ 😆",
-  "อิ่มจังตังอยู่ครบ อิ อิ 😜",
-  "บิลนี้ไม่มีใครหนีแน่นอน 💸",
-  "ขอให้มื้อนี้อิ่มแบบแฟร์ ๆ 😋",
-  "หารง่าย จ่ายสบาย 👍",
-  "มื้อนี้อร่อยแน่ แต่อย่าลืมกดเลือกคนกินด้วยนะ 😏",
-  "กินได้เต็มที่ เดี๋ยวระบบช่วยคำนวณให้เอง 🤖",
-  "อิ่มก่อน คิดเงินทีหลัง เดี๋ยวแอปจัดการให้ 🍽️",
-  "สายแดกตัวจริง ต้องไม่ลืมหารนะ 🤭",
-  "กินเยอะแค่ไหน ก็แฟร์ได้ 💙",
-  "เพื่อนรักต้องหารเท่า ๆ กันนะ 🫶",
-  "สั่งได้ไม่อั้น แต่ต้องเลือกคนกินด้วยนะ 😎",
-  "จ่ายครบ ไม่มีดราม่า ✨",
-  "วันนี้อิ่มท้อง พรุ่งนี้อิ่มใจ 😆",
-  "ระบบพร้อมแล้ว ลุยสั่งอาหารเลย 🔥",
-  "มื้อนี้ไม่มีคำว่าโกง มีแต่คำว่าแฟร์ 🤝",
-  "กินกันให้สุด แล้วหยุดที่ความยุติธรรม ⚖️",
-  "หารดี ๆ ชีวิตจะดีเอง 😂",
-  "แค่กินอย่างเดียวไม่พอ ต้องกดเลือกชื่อด้วยนะ 😝"
+  "กินข้าวมื้อนี้ให้อร่อยนะ ",
+  "อย่าลืมหารให้ครบทุกคนนะ ",
+  "อิ่มจังตังอยู่ครบ อิ อิ ",
+  "บิลนี้ไม่มีใครหนีแน่นอน ",
+  "ขอให้มื้อนี้อิ่มแบบแฟร์ ๆ ",
+  "หารง่าย จ่ายสบาย ",
+  "มื้อนี้อร่อยแน่ แต่อย่าลืมกดเลือกคนกินด้วยนะ ",
+  "กินได้เต็มที่ เดี๋ยวระบบช่วยคำนวณให้เอง ",
+  "อิ่มก่อน คิดเงินทีหลัง เดี๋ยวแอปจัดการให้ ",
+  "สายแดกตัวจริง ต้องไม่ลืมหารนะ ",
+  "กินเยอะแค่ไหน ก็แฟร์ได้ ",
+  "เพื่อนรักต้องหารเท่า ๆ กันนะ ",
+  "สั่งได้ไม่อั้น แต่ต้องเลือกคนกินด้วยนะ ",
+  "จ่ายครบ ไม่มีดราม่า ",
+  "วันนี้อิ่มท้อง พรุ่งนี้อิ่มใจ ",
+  "ระบบพร้อมแล้ว ลุยสั่งอาหารเลย ",
+  "มื้อนี้ไม่มีคำว่าโกง มีแต่คำว่าแฟร์ ",
+  "กินกันให้สุด แล้วหยุดที่ความยุติธรรม ",
+  "หารดี ๆ ชีวิตจะดีเอง ",
+  "แค่กินอย่างเดียวไม่พอ ต้องกดเลือกชื่อด้วยนะ "
 ];
 
 const handleLogin = async () => {
@@ -479,7 +501,7 @@ const handleLogout = () => {
       Swal.fire({
         icon: "success",
         title: "ออกจากระบบแล้ว",
-        text: "แล้วพบกันใหม่นะ 👋",
+        text: "แล้วพบกันใหม่นะ",
         confirmButtonText: "ตกลง",
         buttonsStyling: false,
         customClass: {
@@ -652,7 +674,7 @@ const handleClearBill = () => {
     "ต้องการล้างบิลทั้งหมดและเริ่มใหม่ใช่ไหม?",
     () => {
 
-      setMembers(['เรา']);
+      setMembers([{ name: 'เรา', avatar: getRandomAvatar() }]);
       setItems([]);
 
       setUseVat(false);
@@ -710,7 +732,7 @@ const handleClearBill = () => {
     try {
       // 3. เตรียมข้อมูล
       const roomPayload = {
-        hostName: user ? user.displayName : members[0] || "Host", 
+        hostName: user ? user.displayName : members[0].name,
         hostUid: user ? user.uid : "anon",
         createdAt: new Date(),
         items: items,
@@ -757,13 +779,12 @@ const handleClearBill = () => {
   // ==================================================
 
   const handleAddMember = useCallback(() => {
-    if (
-      memberName.trim() &&
-      !members.includes(memberName.trim())
-    ) {
+    const trimmed = memberName.trim();
+
+    if (trimmed && !members.find(m => m.name === trimmed)) {
       setMembers(prev => [
         ...prev,
-        memberName.trim()
+        { name: trimmed, avatar: getRandomAvatar() }
       ]);
       setMemberName('');
     }
@@ -790,7 +811,7 @@ const handleRemoveMember = useCallback((target) => {
     `ต้องการลบ ${target} ออกใช่ไหม?`,
     () => {
       setMembers(prev =>
-        prev.filter(m => m !== target)
+        prev.filter(m => m.name !== target)
       );
 
       setItems(prevItems =>
@@ -902,7 +923,7 @@ const handleRemoveMember = useCallback((target) => {
 
   // ✅ ฟังก์ชันเลือกทั้งหมด / ยกเลิกทั้งหมด ในแต่ละเมนู
   const toggleSelectAll = (item) => {
-    const allMembers = members;
+    const allMembers = members.map(m => m.name);
     const isAllSelected = item.participants.length === allMembers.length;
 
     setItems(prevItems => 
@@ -1083,56 +1104,58 @@ const renderContent = () => {
     // ==================================================
     // 🔸 MEMBERS
     // ==================================================
-    case 'members':
-      return (
-        <div className="content-card animate-fade-in">
+case 'members':
+  return (
+    <div className="content-card animate-fade-in">
 
-          <div className="section-header">
-            <Users size={20} />
-            <h3>จัดการสมาชิก ({members.length})</h3>
-          </div>
+      <div className="section-header">
+        <Users size={20} />
+        <h3>จัดการสมาชิก ({members.length})</h3>
+      </div>
 
-          <div className="member-chips-container">
-            {members.map(m => (
-              <div
-                key={m}
-                className={`member-chip ${m === 'เรา' ? 'me' : ''}`}
-              >
-                <div className="avatar">{m.charAt(0)}</div>
-                <span>{m}</span>
-                <button
-                  onClick={() => handleRemoveMember(m)}
-                  className="btn-icon-small"
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
-          </div>
-
-          <div className="input-row">
-            <input
-              type="text"
-              placeholder="เพิ่มชื่อเพื่อน..."
-              value={memberName}
-              onChange={(e) => setMemberName(e.target.value)}
-              onKeyDown={(e) =>
-                e.key === 'Enter' && handleAddMember()
-              }
-            />
-            {/* ✅ ปุ่ม + เปลี่ยนสีตามสถานะ */}
-            <button
-              onClick={handleAddMember}
-              disabled={!memberName.trim()}
-              className={memberName.trim() ? "btn-add-green" : "btn-gray-add"}
+      <div className="member-chips-container">
+          {members.map(m => (
+            <div
+              key={m.name}
+              className={`member-chip ${m.name === 'เรา' ? 'me' : ''}`}
             >
-              <Plus size={20} />
-            </button>
-          </div>
+              <div className="avatar">
+                {m.avatar}
+              </div>
 
-        </div>
-      );
+              <span>{m.name}</span>
 
+              <button
+                onClick={() => handleRemoveMember(m.name)}
+                className="btn-icon-small"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+      </div>
+
+      <div className="input-row">
+        <input
+          type="text"
+          placeholder="เพิ่มชื่อเพื่อน..."
+          value={memberName}
+          onChange={(e) => setMemberName(e.target.value)}
+          onKeyDown={(e) =>
+            e.key === 'Enter' && handleAddMember()
+          }
+        />
+        <button
+          onClick={handleAddMember}
+          disabled={!memberName.trim()}
+          className={memberName.trim() ? "btn-add-green" : "btn-gray-add"}
+        >
+          <Plus size={20} />
+        </button>
+      </div>
+
+    </div>
+  );
 
     // ==================================================
     // 🔸 ITEMS
@@ -1163,16 +1186,17 @@ const renderContent = () => {
                 value={itemQty}
                 onChange={(e) => setItemQty(e.target.value)}
               />
-              <input
+                <input
                 className="input-price"
-                type="number"
+                type="text"
+                inputMode="decimal"
                 placeholder="ราคา"
-                min="0"
-                step="0.01"
                 value={itemPrice}
                 onChange={(e) => {
                   const value = e.target.value;
-                  if (value === '' || Number(value) >= 0) {
+
+                  // อนุญาตเฉพาะตัวเลขและจุดทศนิยม
+                  if (/^\d*\.?\d*$/.test(value)) {
                     setItemPrice(value);
                   }
                 }}
@@ -1270,16 +1294,18 @@ const renderContent = () => {
                               <div className="participant-selector-row">
                                 {members.map(m => (
                                   <button
-                                    key={m}
+                                    key={m.name}
                                     onClick={() =>
-                                      toggleParticipant(item.id, m)
+                                      toggleParticipant(item.id, m.name)
                                     }
-                                    className={`toggle-chip-pill ${item.participants.includes(m) ? 'active' : ''}`}
+                                    className={`toggle-chip-pill ${
+                                      item.participants.includes(m.name) ? 'active' : ''
+                                    }`}
                                   >
-                                    {item.participants.includes(m) &&
+                                    {item.participants.includes(m.name) &&
                                       <Check size={10} strokeWidth={4} />
                                     }
-                                    {m}
+                                    {m.avatar} {m.name}
                                   </button>
                                 ))}
                               </div>
@@ -1408,19 +1434,16 @@ const renderContent = () => {
               <hr className="divider-soft" />
 
               <div className="summary-rows">
-                {members.map(m => (
-                  <div
-                    key={m}
-                    className="summary-row-dark-item"
-                  >
-                    <div className="summary-name">
-                      <div className="avatar-small-dark">
-                        {m.charAt(0)}
+                  {members.map(m => (
+                    <div key={m.name} className="summary-row-dark-item">
+                      <div className="summary-name">
+                        <div className="avatar-small-dark">
+                          {m.avatar}
+                        </div>
+                        {m.name}
                       </div>
-                      {m}
-                    </div>
                     <span className="summary-amount-green">
-                      {memberShares[m]?.toLocaleString(undefined, {
+                      {memberShares[m.name]?.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                       })} ฿
@@ -1956,7 +1979,7 @@ return (
               className="btn-full-primary" 
               onClick={() => window.open(createdRoom.link, '_blank')}
             >
-              🚀 เปิดหน้าเว็บดูเอง
+               เปิดหน้าเว็บดูเอง
             </button>
             {/* ✅ ปุ่มย้อนกลับ (ย้ายมาล่างสุด) */}
             <button 
