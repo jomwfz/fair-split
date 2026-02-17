@@ -260,6 +260,11 @@ const [members, setMembers] = useState(() => {
       localStorage.getItem('fs_promptPay') || ''
     );
 
+    const [promptPayName, setPromptPayName] = useState(() =>
+  localStorage.getItem('fs_promptPayName') || ''
+    );
+
+
   const [showQR, setShowQR] = useState(false);
 
   // ==================================================
@@ -283,13 +288,16 @@ const [members, setMembers] = useState(() => {
     localStorage.setItem('fs_useSVC', useServiceCharge);
     localStorage.setItem('fs_svcPercent', serviceChargePercent);
     localStorage.setItem('fs_promptPay', promptPayId);
+    localStorage.setItem('fs_promptPayName', promptPayName);
+
   }, [
     members,
     items,
     useVat,
     useServiceCharge,
     serviceChargePercent,
-    promptPayId
+    promptPayId,
+    promptPayName   // ✅ เพิ่มอันนี้
   ]);
 
   // 🔸 Auth Listener
@@ -731,8 +739,8 @@ const handleClearBill = () => {
   
     try {
       // 3. เตรียมข้อมูล
-      const roomPayload = {
-        hostName: user ? user.displayName : members[0].name,
+        const roomPayload = {
+        hostName: promptPayName || (user ? user.displayName : members[0].name),
         hostUid: user ? user.uid : "anon",
         createdAt: new Date(),
         items: items,
@@ -1621,41 +1629,100 @@ case 'members':
           <div className="payment-box">
             
             {/* ✅ Mode 1: ยังไม่ได้ยืนยันเบอร์ */}
-            {!isPromptPayConfirmed ? (
-                <>
+                {!isPromptPayConfirmed ? (
+                  <>
+                    {/* ✅ เพิ่มช่องชื่อ */}
                     <div className="input-row-icon">
-                        <Smartphone size={18} className="icon-input" />
-                        <input
-                            type="text"
-                            className="input-promptpay"
-                            placeholder="เบอร์มือถือ / เลขบัตร ปชช."
-                            maxLength={13}
-                            value={promptPayId}
-                            onChange={(e) => {
-                            const val = e.target.value.replace(/[^0-9]/g, '');
-                            setPromptPayId(val);
-                            }}
-                        />
-                    </div>
-                    <button 
-                        className="btn-full-primary"
-                        onClick={() => {
-                            if (isValidLength) setIsPromptPayConfirmed(true);
-                            else Swal.fire("แจ้งเตือน", "กรุณากรอกเบอร์ให้ถูกต้อง", "warning");
-                        }}
-                        disabled={!isValidLength}
-                    >
-                        ยืนยันเบอร์พร้อมเพย์
-                    </button>
-                </>
-            ) : (
-                /* ✅ Mode 2: ยืนยันแล้ว เลือกได้ 2 ทาง */
-                <div className="promptpay-confirmed-box animate-fade-in">
-                    <div className="confirmed-header">
-                        <span>✅ เบอร์: {promptPayId}</span>
-                        <button className="btn-edit-small" onClick={() => setIsPromptPayConfirmed(false)}>แก้ไข</button>
+                      <User size={18} className="icon-input" />
+                      <input
+                        type="text"
+                        className="input-promptpay"
+                        placeholder="ชื่อเจ้าของบัญชี"
+                        value={promptPayName}
+                        onChange={(e) => setPromptPayName(e.target.value)}
+                      />
                     </div>
 
+                    <div className="input-row-icon">
+                      <Smartphone size={18} className="icon-input" />
+                      <input
+                        type="text"
+                        className="input-promptpay"
+                        placeholder="เบอร์มือถือ / เลขบัตร ปชช."
+                        maxLength={13}
+                        value={promptPayId}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9]/g, '');
+                          setPromptPayId(val);
+                        }}
+                      />
+                    </div>
+
+                    <button 
+                      className="btn-full-primary"
+                      onClick={() => {
+                        if (!promptPayName.trim()) {
+                          Swal.fire("แจ้งเตือน", "กรุณากรอกชื่อเจ้าของบัญชี", "warning");
+                          return;
+                        }
+
+                        if (isValidLength) {
+                          setIsPromptPayConfirmed(true);
+                        } else {
+                          Swal.fire("แจ้งเตือน", "กรุณากรอกเบอร์ให้ถูกต้อง", "warning");
+                        }
+                      }}
+                      disabled={!isValidLength || !promptPayName.trim()}
+                    >
+                      ยืนยันข้อมูลพร้อมเพย์
+                    </button>
+                  </>
+                ) : (
+                /* ✅ Mode 2: ยืนยันแล้ว เลือกได้ 2 ทาง */
+                <div className="promptpay-confirmed-box animate-fade-in">
+                        <div className="confirmed-wrapper">
+
+                          {/* 🔹 เบอร์พร้อมเพย์ */}
+                          <div className="confirmed-card number-card">
+                            <div className="confirmed-left">
+                              <span className="icon">📱</span>
+                              <div>
+                                <small>เบอร์พร้อมเพย์</small>
+                                <div className="value">{promptPayId}</div>
+                              </div>
+                            </div>
+
+                            <button
+                              className="btn-edit-small"
+                              onClick={() => setIsPromptPayConfirmed(false)}
+                            >
+                              ✏️
+                            </button>
+                          </div>
+
+
+                          {/* 🔹 ชื่อบัญชี */}
+                          {promptPayName && (
+                            <div className="confirmed-card name-card">
+                              <div className="confirmed-left">
+                                <span className="icon">👤</span>
+                                <div>
+                                  <small>ชื่อบัญชี</small>
+                                  <div className="value">{promptPayName}</div>
+                                </div>
+                              </div>
+
+                              {/* ✅ เพิ่มปุ่มแก้ไขชื่อ */}
+                              <button
+                                className="btn-edit-small"
+                                onClick={() => setIsPromptPayConfirmed(false)}
+                              >
+                                ✏️
+                              </button>
+                            </div>
+                          )}
+
+                        </div>
                     <div className="payment-mode-grid">
                         <button 
                             className={`mode-card ${showQR ? 'active' : ''}`}

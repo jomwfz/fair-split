@@ -187,7 +187,9 @@ const GuestPay = () => {
                     <div className="member-avatar">
                       {avatar}
                     </div>
-                    <span>{name}</span>
+                    <span>
+                      {name === 'เรา' ? 'หัวบิล' : name}
+                    </span>
                   </button>
                 );
               })}
