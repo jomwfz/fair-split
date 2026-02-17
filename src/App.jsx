@@ -13,7 +13,7 @@ import {
   Plus, Trash2, Users, Receipt, Check, Coffee, X, Edit2, RefreshCw,
   Percent, Smartphone, ArrowRight, Menu, LayoutDashboard, UtensilsCrossed,
   Wallet, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, LogOut,
-  History, Save, FileText, Calendar, User, Share2, Copy, CheckCircle, Home // เพิ่ม Home icon
+  History, Save, FileText, Calendar, User, Share2, Copy, CheckCircle, Home, Utensils, Calculator, CreditCard // เพิ่ม Home icon
 } from 'lucide-react';
 
 import { auth, googleProvider, db } from './firebase';
@@ -34,6 +34,11 @@ const getRandomAvatar = () => {
     Math.floor(Math.random() * avatarEmojis.length)
   ];
 };
+
+
+
+// นำเข้ารูปภาพประกอบจากโฟลเดอร์ assets ของคุณเอง (แก้ชื่อไฟล์ให้ตรง)
+import heroImage from './assets/hero.png';
 
 // ======================================================
 // 🔷 HELPER FUNCTIONS (PURE LOGIC)
@@ -1054,61 +1059,75 @@ const renderContent = () => {
     // 🔸 HOME
     // ==================================================
     case 'home':
-      return (
-        <div className="home-landing animate-fade-in">
-
-          <div className="home-hero">
-            <div className="hero-icon">
-              <Receipt size={48} />
-            </div>
-            <h1>ยินดีต้อนรับสู่ FairSplit</h1>
-            <p className="hero-subtext">
-              เว็บช่วยหารค่าอาหารแบบแฟร์ ๆ  
-              ใส่เมนู เลือกคนกิน ระบบคำนวณให้ครบ  
-              ไม่มีใครจ่ายเกิน ไม่มีใครหนีบิล 😆
-            </p>
-
-            <div className="hero-buttons">
-              <button
-                className="btn-start"
-                onClick={() => setActiveTab('members')}
-              >
-                เริ่มทำบิลเลย
-              </button>
-
-              {!user && (
-                <button
-                  className="btn-login-hero"
-                  onClick={handleLogin}
-                >
-                  เข้าสู่ระบบด้วย Google
-                </button>
-              )}
-            </div>
-          </div>
-
-
-          <div className="home-features">
-            <div className="feature-card">
-              <Users size={28} />
-              <h4>จัดการสมาชิกง่าย</h4>
-              <p>เพิ่มเพื่อน เลือกคนหาร ได้ในคลิกเดียว</p>
-            </div>
-            <div className="feature-card">
-              <LayoutDashboard size={28} />
-              <h4>คำนวณอัตโนมัติ</h4>
-              <p>รวม VAT / Service Charge ให้ครบ</p>
-            </div>
-            <div className="feature-card">
-              <Wallet size={28} />
-              <h4>สร้าง QR รับเงิน</h4>
-              <p>สแกนจ่ายได้ทันทีผ่าน PromptPay</p>
-            </div>
-          </div>
-
+  return (
+    <div className="home-container animate-fade-in">
+      
+      {/* โลโก้ด้านบน */}
+      <div className="home-logo-container">
+        <div className="home-logo-icon">
+          <Receipt size={18} strokeWidth={2.5} />
         </div>
-      );
+        <span className="home-logo-text">FairSplit</span>
+      </div>
 
+      {/* หัวข้อหลัก */}
+      <h1 className="home-title">ยินดีต้อนรับสู่ FairSplit</h1>
+      
+      {/* 🟢 รูปภาพของคุณ (ดึงจากไฟล์ในเครื่องที่คุณ import มา) 🟢 */}
+      <div className="home-image-wrapper">
+        <img 
+          src={heroImage} 
+          alt="Welcome to FairSplit" 
+          className="home-hero-image"
+        />
+      </div>
+
+      {/* ปุ่มกด 2 ปุ่ม (แบบเป๊ะตามรูป) */}
+      <div className="home-buttons-container">
+        <button 
+          className="btn-home-start"
+          onClick={() => setActiveTab('members')}
+        >
+          เริ่มทำบิลเลย
+        </button>
+
+        {!user && (
+          <button 
+            className="btn-home-google"
+            onClick={handleLogin}
+          >
+            เข้าสู่ระบบด้วย Google
+          </button>
+        )}
+      </div>
+
+      {/* เมนู 4 ช่องด้านล่าง (ปรับไอคอนให้ตรงตามรูปเป๊ะ) */}
+      <div className="home-features-grid">
+        <div className="feature-box">
+          <Users size={22} className="feature-icon" />
+          <span>จัดการสมาชิกง่าย</span>
+        </div>
+        <div className="feature-box">
+          <Utensils size={22} className="feature-icon" />
+          <span>เพิ่มรายการอาหาร</span>
+        </div>
+        <div className="feature-box">
+          <Calculator size={22} className="feature-icon" />
+          <span>คำนวณยอดทันที</span>
+        </div>
+        <div className="feature-box">
+          <CreditCard size={22} className="feature-icon" />
+          <span>ชำระเงินสะดวก</span>
+        </div>
+      </div>
+
+      {/* เครดิตด้านล่าง (ตามรูปคือ dev by ชื่อกลุ่ม) */}
+      <footer className="home-footer">
+        © 2026 FairSplit | dev by ชื่อกลุ่ม
+      </footer>
+      
+    </div>
+  );
     // ==================================================
     // 🔸 MEMBERS
     // ==================================================
